@@ -1,0 +1,26 @@
+/*
+* bgp-policy-check.slax
+* Written by: Justin Ryburn (jryburn@juniper.net)
+* Last update: 12/14/12
+*/
+
+version 1.0;
+
+ns junos = "http://xml.juniper.net/junos/*/junos";
+ns xnm = "http://xml.juniper.net/xnm/1.1/xnm";
+ns jcs = "http://xml.juniper.net/junos/commit-scripts/1.0";
+
+import "../import/junos.xsl";
+
+match configuration {
+
+    /* Scroll through all peers making sure DEFAULT-OUT policy is applied. */
+    for-each( protocols/bgp/group[name='CUST']/neighbor ) {
+        if ( jcs:empty(export) or ( export != 'DEFAULT-OUT') ) {
+            <xnm:error> {
+                call jcs:edit-path();
+                <message> "Peers must have DEFAULT-OUT policy applied.";
+            }
+        }
+    }
+}

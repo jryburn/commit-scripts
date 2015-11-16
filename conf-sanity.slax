@@ -1,0 +1,78 @@
+/*
+* conf-sanity.slax
+* Written by: Justin Ryburn (jryburn@juniper.net)
+* Last update: 11/10/09
+*/
+
+version 1.0;
+
+ns junos = "http://xml.juniper.net/junos/*/junos";
+ns xnm = "http://xml.juniper.net/xnm/1.1/xnm";
+ns jcs = "http://xml.juniper.net/junos/commit-scripts/1.0";
+
+import "../import/junos.xsl";
+match configuration {
+
+/*
+* Check to make sure someone did not delete or disable fxp0.
+* Since deleting the "interfaces" tree would obviously delete the fxp0
+* interface, that mistake would be caught here as well.
+*/
+    call error-if-missing($must = interfaces/interface[name='fxp0']/unit[name='0']/family/inet/address, $statement = 'interfaces fxp0 unit 0 family inet address');
+    call error-if-present($must = interfaces/interface[name='fxp0']/disable | interfaces/interface[name='fxp0']/unit[name='0']/disable) {
+        with $message = {
+            expr "The fxp0 interface is disabled.";
+        }
+    }
+
+/* Check for someone deleting or disabling the lo0 interface. */
+    call error-if-missing($must = interfaces/interface[name='lo0']/unit[name='0']/family/inet/address, $statement = 'interfaces lo0 unit 0 family inet address');
+    call error-if-present($must = interfaces/interface[name='lo0']/disable | interfaces/interface[name='lo0']/unit[name='0']/disable) {
+        with $message = {
+            expr "The lo0 interface is disabled.";
+        }
+    }
+
+/* Check for someone deleting "protocols bgp" or "protocols". */
+    call error-if-missing($must = protocols/bgp, $statement = 'protocols bgp');
+
+/* Check for someone deleting the "firewall" tree. */
+    call error-if-missing($must = firewall, $statement = 'firewall');
+
+/* Check for someone deleting the "class-of-service" tree. */
+    call error-if-missing($must = class-of-service, $statement = 'class-of-service');
+
+/* Check for someone deleting the "policy-options" tree. */
+    call error-if-missing($must = policy-options, $statement = 'policy-options');
+
+/* Check for someone deleting "routing-options static". */
+    call error-if-missing($must = routing-options/static, $statement = 'routing-options static');
+}
+error-if-missing ($must, $statement = 'unknown', $message =
+               'missing mandatory configuration statement') {
+
+
+    if (not($must)) {
+        <xnm:error> {
+            <edit-path> {
+                copy-of $statement;
+            }
+            <message> {
+                copy-of $message;
+            }
+        }
+    }
+}
+error-if-present ($must = 1, $message = 'invalid configuration statement') {
+
+
+    for-each ($must) {
+        <xnm:error> {
+            call jcs:edit-path();
+            call jcs:statement();
+            <message> {
+                copy-of $message;
+            }
+        }
+    }
+}
